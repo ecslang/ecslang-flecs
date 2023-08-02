@@ -1,0 +1,13 @@
+add_library(tests_module_cpp_lib
+    STATIC
+    simple.cpp
+    simple.h
+)
+target_compile_definitions(tests_module_cpp_lib
+    PRIVATE
+    MODULE_BUILD
+)
+target_link_libraries(tests_module_cpp_lib
+    PRIVATE
+    flecs
+)

@@ -1,5 +1,5 @@
 #include "flecs.h"
-#include "doctest/doctest.h"
+#include "doctest.h"
 
 TEST_CASE("flecs system tests") {
     flecs::world world;
