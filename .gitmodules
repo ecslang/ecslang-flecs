@@ -1,3 +1,6 @@
 [submodule "extern/doctest/doctest"]
 	path = extern/doctest/doctest
 	url = https://github.com/doctest/doctest.git
+[submodule "extern/flecs/flecs"]
+	path = extern/flecs/flecs
+	url = https://github.com/SanderMertens/flecs.git
