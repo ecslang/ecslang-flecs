@@ -13,14 +13,28 @@ module::module(flecs::world& ecs) {
     // Component registration is optional, however by registering components
     // inside the module constructor, they will be created inside the scope
     // of the module.
-    ecs.component<Position>();
-    ecs.component<Velocity>();
+    ecs.component<Position>()
+        .member<double>("x")
+        .member<double>("y");
+    ecs.component<Velocity>()
+        .member<double>("x")
+        .member<double>("y");
 
     ecs.system<Position, const Velocity>("Move")
-            .each([](Position& p, const Velocity& v) {
-                p.x += v.x;
-                p.y += v.y;
-            });
+        .each([](flecs::iter& it, size_t, Position& p, const Velocity& v) {
+            p.x += v.x * it.delta_time();
+            p.y += v.y * it.delta_time();
+        });
+
+    // Startup system
+    ecs.system("OnStart")
+        .kind(flecs::OnStart)
+        .iter([](flecs::iter& it) {
+            it.world()
+                .entity("Entity")
+                .set<simple::Position>({10, 20})
+                .set<simple::Velocity>({1, 1});
+        });
 }
 
 }

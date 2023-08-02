@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-MODULE_EXPORT void SimpleModuleImport(ecs_world_t *world);
+MODULE_EXPORT ecs_entity_t SimpleModuleImport(ecs_world_t *world);
 
 #ifdef __cplusplus
 }
