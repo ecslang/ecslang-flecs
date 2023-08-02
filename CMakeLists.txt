@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(ecslang LANGUAGES CXX)
 
 # Prepare doctest for other targets to use
-add_subdirectory(extern/doctest)
+add_subdirectory(extern/doctest/doctest)
 
 # Make test executable
 add_executable(tests src/main.cpp)
