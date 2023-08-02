@@ -107,7 +107,6 @@ TEST_CASE("flecs module tests") {
     std::string moduleLibraryPath {moduleLibraryName };
 
     auto binaryPath = sBinaryName;
-    std::cout << "binaryPath: " << binaryPath << std::endl;
     auto binaryDirSepIdx = binaryPath.rfind('/');
     if (binaryDirSepIdx != std::string::npos) {
         moduleLibraryPath = binaryPath.substr(0, binaryDirSepIdx+1) + moduleLibraryName;
