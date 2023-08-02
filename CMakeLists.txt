@@ -6,7 +6,9 @@ add_subdirectory(extern/doctest/doctest)
 add_subdirectory(extern/flecs)
 
 # Make test executable
-add_executable(tests src/main.cpp)
+add_executable(tests
+        test/ecs.cpp
+        test/main.cpp)
 target_compile_features(tests PRIVATE cxx_std_17)
 target_link_libraries(tests PRIVATE
         doctest
