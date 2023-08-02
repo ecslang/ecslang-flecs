@@ -29,8 +29,6 @@ function(add_flecs_library TARGET_NAME LIB_TYPE)
     add_library(${TARGET_NAME} ${LIB_TYPE} ${LIB_SOURCE_FILES})
     set_property(TARGET ${TARGET_NAME} PROPERTY C_VISIBILITY_PRESET hidden)
 
-    target_include_directories(${TARGET_NAME} PUBLIC flecs/include)
-
     if (LIB_ADDON_FLAGS)
         target_compile_definitions(${TARGET_NAME} PUBLIC FLECS_CUSTOM_BUILD ${LIB_ADDON_FLAGS})
     endif()
@@ -40,7 +38,11 @@ function(add_flecs_library TARGET_NAME LIB_TYPE)
     endif()
 
     if (LIB_TYPE STREQUAL "STATIC")
+        target_include_directories(${TARGET_NAME} PUBLIC flecs/include)
         target_compile_definitions(${TARGET_NAME} PRIVATE flecs_STATIC)
+    else()
+        target_include_directories(${TARGET_NAME} PUBLIC flecs/include)
+        target_compile_definitions(${TARGET_NAME} PRIVATE flecs_EXPORTS)
     endif()
 
     if(WIN32)
@@ -54,3 +56,4 @@ endfunction()
 add_flecs_library(flecs_static STATIC)
 add_library(flecs ALIAS flecs_static)
 
+add_flecs_library(flecs_shared SHARED)
