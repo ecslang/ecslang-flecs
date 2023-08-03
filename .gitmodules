@@ -4,3 +4,6 @@
 [submodule "extern/flecs/flecs"]
 	path = extern/flecs/flecs
 	url = https://github.com/SanderMertens/flecs.git
+[submodule "extern/quickjs/quickjs"]
+	path = extern/quickjs/quickjs
+	url = https://github.com/ecslang/quickjs.git
