@@ -7,3 +7,6 @@
 [submodule "extern/llvm/llvm"]
 	path = extern/llvm/llvm
 	url = https://github.com/llvm/llvm-project.git
+[submodule "extern/vast/vast"]
+	path = extern/vast/vast
+	url = https://github.com/trailofbits/vast.git
