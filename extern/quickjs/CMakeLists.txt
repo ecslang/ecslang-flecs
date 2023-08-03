@@ -1,0 +1,1 @@
+add_subdirectory(quickjs EXCLUDE_FROM_ALL)

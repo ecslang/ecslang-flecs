@@ -14,5 +14,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Prepare doctest for other targets to use
 add_subdirectory(extern/doctest)
 add_subdirectory(extern/flecs)
+add_subdirectory(extern/quickjs)
 
 add_subdirectory(test)
