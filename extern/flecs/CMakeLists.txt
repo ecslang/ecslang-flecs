@@ -39,7 +39,7 @@ function(add_flecs_library TARGET_NAME LIB_TYPE)
 
     if (LIB_TYPE STREQUAL "STATIC")
         target_include_directories(${TARGET_NAME} PUBLIC flecs/include)
-        target_compile_definitions(${TARGET_NAME} PRIVATE flecs_STATIC)
+        target_compile_definitions(${TARGET_NAME} PUBLIC flecs_STATIC)
     else()
         target_include_directories(${TARGET_NAME} PUBLIC flecs/include)
         target_compile_definitions(${TARGET_NAME} PRIVATE flecs_EXPORTS)
