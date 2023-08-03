@@ -8,4 +8,4 @@ swiftc -dump-ast module_simple.swift
 
 ## compile without stdlib
 
-see https://forums.swift.org/t/swift-with-no-standard-library/61198/18
+see https://forums.swift.org/t/swift-with-no-standard-library/61198/7
