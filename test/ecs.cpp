@@ -150,9 +150,9 @@ TEST_CASE("flecs system tests") {
                             }
                             std::cout << std::endl;
                         }
-
-                        evts.push_back(evt);
                     }
+
+                    evts.push_back(evt);
                 });
 
         REQUIRE_EQ(evts.size(), 0);
