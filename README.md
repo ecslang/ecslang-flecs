@@ -8,3 +8,4 @@
 - [ ] evaluate AssemblyScript
 - [ ] evaluate Zig
 - [ ] evaluate LLVM & C++20-Modules
+- [ ] evaluate Odin
