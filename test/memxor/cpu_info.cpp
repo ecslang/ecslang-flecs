@@ -91,6 +91,7 @@ struct CacheDetails {
 int main() {
     std::vector<CacheDetails> caches;
 
+    bool supportsSSE2 = false;
     bool supportsAVX = false;
     bool supportsAVX2 = false;
     bool supportsAVX512 = false;
@@ -100,10 +101,13 @@ int main() {
     __cpuid(cpuInfo, 1);
     supportsAVX = cpuInfo[2] & (1 << 28);
 
+    supportsSSE2 = cpuInfo[3] & (1 << 26);
+
     __cpuidex(cpuInfo, 7, 0);
     supportsAVX2 = cpuInfo[1] & (1 << 5);
     supportsAVX512 = cpuInfo[1] & (1 << 16);
 #elif defined(__GNUC__) || defined(__clang__)
+    supportsSSE2  = __builtin_cpu_supports("sse2");
     supportsAVX   = __builtin_cpu_supports("avx");
     supportsAVX2  = __builtin_cpu_supports("avx2");
     supportsAVX512 = __builtin_cpu_supports("avx512f");
@@ -252,8 +256,12 @@ int main() {
         }
     }
 
-    if (supportsAVX || supportsAVX2 || supportsAVX512) {
+    if (supportsSSE2 || supportsAVX || supportsAVX2 || supportsAVX512) {
         std::cout << "\nRuntime Supported SIMD Intrinsics:\n";
+
+        if (supportsSSE2) {
+            std::cout << "- SSE2\n";
+        }
 
         if (supportsAVX) {
             std::cout << "- AVX\n";
