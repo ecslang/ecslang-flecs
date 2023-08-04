@@ -9,6 +9,7 @@
 - [ ] evaluate Zig
 - [ ] evaluate LLVM & C++20-Modules
 - [ ] evaluate Odin
+- [ ] evaluate [Val](https://www.val-lang.dev/)
 
 ## Runtime
 
