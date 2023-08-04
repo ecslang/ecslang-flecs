@@ -31,7 +31,11 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
 
-        exe.addCSourceFile(b.fmt("{s}.cpp", .{exe_name}), &exe_cflags);
+        //exe.addCSourceFile(b.fmt("{s}.cpp", .{exe_name}), &exe_cflags);
+
+        const src_file = b.fmt("{s}.cpp", .{exe_name});
+        exe.addCSourceFiles(&.{src_file}, &exe_cflags);
+
         exe.linkLibC();
         exe.linkLibCpp();
 
