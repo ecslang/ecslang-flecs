@@ -14,4 +14,4 @@
 ## Runtime
 
 - [ ] evaluate separated process vs hardware virtualization  
-- [ ] evaluate efficient hardware-enabled memory diff-snapshoting (SIMD-XOR based, using bitmaps of cache lines, utilizing low-level memory access order guarantees)
+- [ ] evaluate efficient hardware-enabled memory diff-snapshoting (SIMD-XOR based, using bitmaps of cache lines, utilizing low-level memory access order guarantees, LZ4 compression)
