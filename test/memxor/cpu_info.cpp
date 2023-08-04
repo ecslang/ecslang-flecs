@@ -2,12 +2,22 @@
 #include <iomanip>
 #include <vector>
 #include <cstdint>
+#include <new>
 
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
 #include <sys/utsname.h>
+#endif
+
+#ifdef __cpp_lib_hardware_interference_size
+    using std::hardware_constructive_interference_size;
+    using std::hardware_destructive_interference_size;
+#else
+    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
+    constexpr std::size_t hardware_constructive_interference_size = 64;
+    constexpr std::size_t hardware_destructive_interference_size = 64;
 #endif
 
 struct CacheDetails {
@@ -54,6 +64,14 @@ struct CacheDetails {
         return levelType;
     }
 
+    std::string getSizeInCacheLines() const {
+        if (lineSize == 0) {
+            return "N/A";
+        }
+        int cacheLines = size / lineSize;
+        return std::to_string(cacheLines) + " x " + std::to_string(lineSize) + " bytes";
+    }
+
     uint64_t processorMask;
     int numaNodeNumber;
     bool sharedFunctionalUnits;
@@ -90,12 +108,15 @@ int main() {
             break;
     }
 
-    std::cout << "Number of Processors: " << sysInfo.dwNumberOfProcessors << std::endl;
-
     DWORD bufSize = 0;
     GetLogicalProcessorInformation(0, &bufSize);
     SYSTEM_LOGICAL_PROCESSOR_INFORMATION* buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION*)malloc(bufSize);
     GetLogicalProcessorInformation(buffer, &bufSize);
+
+    constexpr size_t SIZE_INVALID = std::numeric_limits<size_t>::max();
+    size_t cacheLineSize = hardware_destructive_interference_size;
+    size_t cacheLineSizeL1D = SIZE_INVALID;
+    size_t cacheLineSizeL2 = SIZE_INVALID; // Using standard constant for cache line size
 
     for (DWORD offset = 0; offset < bufSize; offset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)) {
         SYSTEM_LOGICAL_PROCESSOR_INFORMATION cpuInfo = buffer[offset / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)];
@@ -129,12 +150,56 @@ int main() {
                 cache.associativity = cacheDesc.Associativity;
             }
 
-            cache.lineSize = cacheDesc.LineSize;
+            DWORD lineSize = cacheDesc.LineSize;
+            cache.lineSize = lineSize;
             cache.size = cacheDesc.Size;
 
+            if (lineSize > 0) {
+                if (cacheDesc.Level == 1 && cacheDesc.Type == CacheData && cacheDesc.LineSize < cacheLineSizeL1D) {
+                    cacheLineSizeL1D = cacheDesc.LineSize;
+                } else if (cacheDesc.Level == 2 && cacheDesc.Type == CacheUnified && cacheDesc.LineSize < cacheLineSizeL2) {
+                    cacheLineSizeL2 = cacheDesc.LineSize;
+                }
+            }
             caches.push_back(cache);
         }
     }
+
+    if (cacheLineSizeL1D != SIZE_INVALID) {
+        cacheLineSize = cacheLineSizeL1D;
+    } else if (cacheLineSizeL2 != SIZE_INVALID) {
+        cacheLineSize = cacheLineSizeL2;
+    }
+
+    size_t cacheLinesPerPage = sysInfo.dwPageSize / cacheLineSize;
+    size_t cacheLinesPerPageL1D = (cacheLineSizeL1D != SIZE_INVALID) ? sysInfo.dwPageSize / cacheLineSizeL1D : SIZE_INVALID;
+
+    std::cout << "Number of Processors: " << sysInfo.dwNumberOfProcessors << std::endl;
+    std::cout << "Cache Line: " << cacheLineSize << " bytes" << std::endl;
+    if (cacheLineSizeL1D != SIZE_INVALID) {
+        std::cout << "Cache Line (L1D): " << cacheLineSizeL1D << " bytes" << std::endl;
+    }
+    if (cacheLineSizeL2 != SIZE_INVALID) {
+        std::cout << "Cache Line (L2): " << cacheLineSizeL2 << " bytes" << std::endl;
+    }
+    if (cacheLinesPerPageL1D != SIZE_INVALID) {
+        std::cout << "Page Size: " << sysInfo.dwPageSize << " bytes (" << cacheLinesPerPageL1D << " x L1D cache line)" << std::endl;
+    }
+    else {
+        std::cout << "Page Size: " << sysInfo.dwPageSize << " bytes (" << cacheLinesPerPage << " x cache line)" << std::endl;
+    }
+    std::cout << "Minimum Application Address: " << sysInfo.lpMinimumApplicationAddress << std::endl;
+    std::cout << "Maximum Application Address: " << sysInfo.lpMaximumApplicationAddress << std::endl;
+    std::cout << "Active Processor Mask: " << sysInfo.dwActiveProcessorMask << std::endl;
+
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    GlobalMemoryStatusEx(&memInfo);
+
+    std::cout << "Total Physical Memory: " << memInfo.ullTotalPhys << " bytes" << std::endl;
+    std::cout << "Available Physical Memory: " << memInfo.ullAvailPhys << " bytes" << std::endl;
+    std::cout << "Total Virtual Memory: " << memInfo.ullTotalVirtual << " bytes" << std::endl;
+    std::cout << "Available Virtual Memory: " << memInfo.ullAvailVirtual << " bytes" << std::endl;
 
     free(buffer);
 #else
@@ -150,15 +215,17 @@ int main() {
     // Note: POSIX doesn't provide an easy way to query CPU cache sizes
 #endif
 
-    std::cout << "\nCache Details:\n";
-    std::cout << "  CPU-Mask  | Level-Type | Associativity | Line Size (bytes) | Size (bytes)\n";
-    std::cout << "------------+------------+---------------+-------------------+---------------\n";
-    for (const auto& cache : caches) {
-        std::cout << std::setw(11) << cache.getProcessorMaskStr() << " | "
-                << std::setw(10) << cache.getLevelTypeStr() << " | "
-                << std::setw(13) << (cache.associativity == -1 ? "Fully Associative" : std::to_string(cache.associativity)) << " | "
-                << std::setw(17) << cache.lineSize << " | "
-                << std::setw(12) << cache.size << '\n';
+    if (!caches.empty()) {
+        std::cout << "\nCache Details:\n";
+        std::cout << "  CPU-Mask  | Level-Type | Associativity |    Cache Size     |     Cache Lines    \n";
+        std::cout << "------------+------------+---------------+-------------------+--------------------\n";
+        for (const auto& cache : caches) {
+            std::cout << std::setw(11) << cache.getProcessorMaskStr() << " | "
+                    << std::setw(10) << cache.getLevelTypeStr() << " | "
+                    << std::setw(13) << (cache.associativity == -1 ? "Fully Associative" : std::to_string(cache.associativity)) << " | "
+                    << std::setw(17) << (std::to_string(cache.size) + " bytes") << " | "
+                    << std::setw(19) << cache.getSizeInCacheLines() << "\n";
+        }
     }
 
     return 0;
