@@ -228,7 +228,6 @@ TEST_CASE("flecs system tests") {
 
             auto q_write = ecs.query<Position, const AddPosition>();
             auto q_read = ecs.query_builder<const Position>()
-                .instanced()
                 .build();
 
             CHECK(q_read.changed());
@@ -263,24 +262,68 @@ TEST_CASE("flecs system tests") {
             REQUIRE_EQ(evts.size(), 0);
             CHECK(q_read.changed());
 
-            SUBCASE("set") {
-                e1.set<Position>({4, 2});
-            }
-            SUBCASE("get_mut + modified") {
-                *e1.get_mut<Position>() = {4, 2};
-                e1.modified<Position>();
+            SUBCASE("write to component triggers OnSet event") {
+                SUBCASE("set") {
+                    e1.set<Position>({4, 2});
+                    REQUIRE_EQ(evts.size(), 1);
+                    CHECK(q_read.changed());
+                }
+                SUBCASE("get_mut + modified") {
+                    *e1.get_mut<Position>() = {4, 2};
+                    e1.modified<Position>();
+                }
+
+                CHECK_COMPONENT_EQ(e1, Position, "{x: 4, y: 2}");
+
+                CHECK(q_read.changed());
+                REQUIRE_EQ(evts.size(), 1);
+                CHECK_EQ(evts.front().evt, flecs::OnSet);
+                CHECK_EQ(evts.front().id, position);
+                REQUIRE_EQ(evts.front().data.size(), 1);
+                CHECK_EQ(evts.front().data[0].id, e1);
+                CHECK_EQ(evts.front().data[0].value, "{x: 4, y: 2}");
+                evts.pop_front();
             }
 
-            REQUIRE_EQ(evts.size(), 1);
-            CHECK(q_read.changed());
+            q_read.iter([](flecs::iter&) {
+            });
+            CHECK_FALSE(q_read.changed());
 
-            CHECK_COMPONENT_EQ(e1, Position, "{x: 4, y: 2}");
-            CHECK_EQ(evts.front().evt, flecs::OnSet);
-            CHECK_EQ(evts.front().id, position);
-            REQUIRE_EQ(evts.front().data.size(), 1);
-            CHECK_EQ(evts.front().data[0].id, e1);
-            CHECK_EQ(evts.front().data[0].value, "{x: 4, y: 2}");
-            evts.pop_front();
+            SUBCASE("defer write") {
+                CHECK_FALSE(q_read.changed());
+
+                CHECK_COMPONENT_EQ(e1, Position, "{x: 2, y: 1}");
+
+                CHECK_FALSE(ecs.is_readonly());
+                ecs.readonly_begin();
+                CHECK(ecs.is_readonly());
+
+                SUBCASE("set") {
+                    e1.set<Position>({4, 2});
+                }
+                SUBCASE("get_mut + modified") {
+                    *e1.get_mut<Position>() = {4, 2};
+                    e1.modified<Position>();
+                }
+
+                CHECK(evts.empty());
+                CHECK_FALSE(q_read.changed());
+
+                CHECK(ecs.is_readonly());
+                ecs.readonly_end();
+                CHECK_FALSE(ecs.is_readonly());
+
+                CHECK(q_read.changed());
+                CHECK_COMPONENT_EQ(e1, Position, "{x: 4, y: 2}");
+
+                REQUIRE_EQ(evts.size(), 1);
+                CHECK_EQ(evts.front().evt, flecs::OnSet);
+                CHECK_EQ(evts.front().id, position);
+                REQUIRE_EQ(evts.front().data.size(), 1);
+                CHECK_EQ(evts.front().data[0].id, e1);
+                CHECK_EQ(evts.front().data[0].value, "{x: 4, y: 2}");
+                evts.pop_front();
+            }
 //
 //            e.set<Position>({20.0, 15.0})
 //                    .set<Rotation>({45.0});
