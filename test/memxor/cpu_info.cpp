@@ -272,7 +272,7 @@ int main() {
         }
 
         if (supportsAVX512) {
-            std::cout << "- AVX-512\n";
+            std::cout << "- AVX-512F\n";
         }
     }
     return 0;
