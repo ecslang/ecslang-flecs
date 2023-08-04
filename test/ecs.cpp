@@ -4,20 +4,31 @@
 
 #include "flecs.h"
 #include "doctest.h"
+#include "defer.h"
 
 struct Vec2d {
     double x, y;
 };
 
 struct Position {
-    double x, y;
+    double x {};
+    double y {};
 };
 
 struct Rotation {
     double deg;
 };
 
+struct AddPosition {
+    double x {};
+    double y {};
+};
+
+#define CHECK_COMPONENT_EQ(e, CompType, jsonStr) \
+    CHECK_EQ(std::string((e).world().to_expr((e).get<CompType>()).c_str()), std::string(jsonStr))
+
 bool DEBUG_LOGGING = true;
+bool OBSERVER_LOGGING = false;
 
 void debug_log_evt(flecs::iter& it)
 {
@@ -65,12 +76,16 @@ void debug_log_evt(flecs::iter& it)
 TEST_CASE("flecs system tests") {
     flecs::world ecs;
 
-    auto position = ecs.component<Position>("Position")
+    auto position = ecs.component<Position>()
             .member<double>("x")
             .member<double>("y");
 
-    auto rotation = ecs.component<Rotation>("Rotation")
+    auto rotation = ecs.component<Rotation>()
             .member<double>("deg");
+
+    auto addPosition = ecs.component<AddPosition>()
+            .member<double>("x")
+            .member<double>("y");
 
     SUBCASE("create and destroy entity") {
         auto e = ecs.entity();
@@ -88,10 +103,12 @@ TEST_CASE("flecs system tests") {
         auto *ptr = e.get(position);
         REQUIRE(ptr);
         CHECK_EQ(ecs.to_expr(position, ptr).c_str(), doctest::String("{x: 10, y: 20}"));
+        CHECK_COMPONENT_EQ(e, Position, "{x: 10, y: 20}");
 
         ptr = e.get(rotation);
         REQUIRE(ptr);
         CHECK_EQ(ecs.to_expr(rotation, ptr).c_str(), doctest::String("{deg: 45}"));
+        CHECK_COMPONENT_EQ(e, Rotation, "{deg: 45}");
     }
 
     SUBCASE("record changes to system") {
@@ -117,85 +134,182 @@ TEST_CASE("flecs system tests") {
         std::deque<ObservedEvent> evts;
 
         auto observer = ecs.observer()
-                //.term(flecs::Any)
-                .term(flecs::Wildcard)
-                .event(flecs::OnAdd)
-                .event(flecs::OnRemove)
-                .event(flecs::OnSet)
-                .iter([&evts](flecs::iter& it) {
-                    //debug_log_evt(it);
-                    ObservedEvent evt;
-                    evt.evt = it.event();
-                    evt.id = it.event_id();
+                    //.term(flecs::Any)
+            .term(flecs::Wildcard)
+            .event(flecs::OnAdd)
+            .event(flecs::OnRemove)
+            .event(flecs::OnSet)
+            .iter([&evts](flecs::iter& it) {
+                //debug_log_evt(it);
+                ObservedEvent evt;
+                evt.evt = it.event();
+                evt.id = it.event_id();
 
-                    auto compId = it.event_id();
+                auto compId = it.event_id();
 
+                if (OBSERVER_LOGGING) {
                     std::cout << " - " << it.event().name() << ": "
                               << it.event_id().str() << ":\n";
+                }
 
-                    for (auto i : it) {
-                        std::string value;
-                        auto* ptr = it.event() != flecs::OnAdd ? it.entity(i).get(compId) : nullptr;
-                        if (ptr) {
-                            auto expr = it.world().to_expr(compId, ptr);
-                            value = expr.c_str();
-                        }
-
-                        evt.data.push_back({it.entity(i), value});
-
-                        if (DEBUG_LOGGING) {
-                            std::cout << "\t" << it.entity(i).name();
-                            if (!value.empty()) {
-                                std::cout << "=" << value;
-                            }
-                            std::cout << std::endl;
-                        }
+                for (auto i : it) {
+                    std::string value;
+                    auto* ptr = it.event() != flecs::OnAdd ? it.entity(i).get(compId) : nullptr;
+                    if (ptr) {
+                        auto expr = it.world().to_expr(compId, ptr);
+                        value = expr.c_str();
                     }
 
-                    evts.push_back(evt);
+                    evt.data.push_back({it.entity(i), value});
+
+                    if (OBSERVER_LOGGING) {
+                        std::cout << "\t" << it.entity(i).path().c_str();
+                        if (!value.empty()) {
+                            std::cout << "=" << value;
+                        }
+                        std::cout << std::endl;
+                    }
+                }
+
+                evts.push_back(evt);
+            });
+
+        Defer defer{[&] {
+            observer.disable();
+            observer.destruct();
+        }};
+
+        SUBCASE("single component changes") {
+            REQUIRE_EQ(evts.size(), 0);
+
+            e.set<Position>({15.0, 42.0});
+
+            REQUIRE_EQ(evts.size(), 1);
+
+            CHECK_EQ(evts.front().evt, flecs::OnSet);
+            CHECK_EQ(evts.front().id, position);
+            REQUIRE_EQ(evts.front().data.size(), 1);
+            CHECK_EQ(evts.front().data[0].id, e);
+            CHECK_EQ(evts.front().data[0].value, "{x: 15, y: 42}");
+            evts.pop_front();
+
+            e.set<Position>({20.0, 15.0})
+                    .set<Rotation>({45.0});
+
+            REQUIRE_EQ(evts.size(), 3);
+
+            CHECK_EQ(evts.front().evt, flecs::OnSet);
+            CHECK_EQ(evts.front().id, position);
+            REQUIRE_EQ(evts.front().data.size(), 1);
+            CHECK_EQ(evts.front().data[0].id, e);
+            CHECK_EQ(evts.front().data[0].value, "{x: 20, y: 15}");
+            evts.pop_front();
+
+            CHECK_EQ(evts.front().evt, flecs::OnAdd);
+            CHECK_EQ(evts.front().id, rotation);
+            REQUIRE_EQ(evts.front().data.size(), 1);
+            CHECK_EQ(evts.front().data[0].id, e);
+            CHECK_EQ(evts.front().data[0].value, std::string{});
+            evts.pop_front();
+
+            CHECK_EQ(evts.front().evt, flecs::OnSet);
+            CHECK_EQ(evts.front().id, rotation);
+            REQUIRE_EQ(evts.front().data.size(), 1);
+            CHECK_EQ(evts.front().data[0].id, e);
+            CHECK_EQ(evts.front().data[0].value, "{deg: 45}");
+            evts.pop_front();
+        }
+
+        SUBCASE("multiple component changes") {
+            e.set<AddPosition>({-10.0, -20.0});
+            auto e1 = ecs.entity().add<Position>().set<AddPosition>({2, 1});
+            auto e2 = ecs.entity().add<Position>().set<AddPosition>({4, 2});
+            auto e3 = ecs.entity().add<Position>().set<AddPosition>({6, 3});
+
+            auto q_write = ecs.query<Position, const AddPosition>();
+            auto q_read = ecs.query_builder<const Position>()
+                .instanced()
+                .build();
+
+            CHECK(q_read.changed());
+            q_read.iter([](flecs::iter&) {
+            });
+            CHECK_FALSE(q_read.changed());
+
+            auto o = ecs.observer<Position>()
+                .event(flecs::OnSet)
+                .iter([](flecs::iter& it) {
+                    std::cout << "[Position:OnSet] " << it.event().name() << ": "
+                              << it.event_id().str() << ":\n";
                 });
+            Defer destructO{[&] {
+                o.disable();
+                o.destruct();
+            }};
 
-        REQUIRE_EQ(evts.size(), 0);
+            evts.clear();
 
-        e.set<Position>({15.0, 42.0});
+            CHECK_COMPONENT_EQ(e, Position, "{x: 10, y: 20}");
+            CHECK_COMPONENT_EQ(e1, Position, "{x: 0, y: 0}");
 
-        REQUIRE_EQ(evts.size(), 1);
+            q_write.each([](Position& pos, const AddPosition& add) {
+                pos.x += add.x;
+                pos.y += add.y;
+            });
 
-        CHECK_EQ(evts.front().evt, flecs::OnSet);
-        CHECK_EQ(evts.front().id, position);
-        REQUIRE_EQ(evts.front().data.size(), 1);
-        CHECK_EQ(evts.front().data[0].id, e);
-        CHECK_EQ(evts.front().data[0].value, "{x: 15, y: 42}");
-        evts.pop_front();
+            CHECK_COMPONENT_EQ(e, Position, "{x: 0, y: 0}");
+            CHECK_COMPONENT_EQ(e1, Position, "{x: 2, y: 1}");
 
-        e.set<Position>({20.0, 15.0})
-         .set<Rotation>({45.0});
+            REQUIRE_EQ(evts.size(), 0);
+            CHECK(q_read.changed());
 
-        REQUIRE_EQ(evts.size(), 3);
+            SUBCASE("set") {
+                e1.set<Position>({4, 2});
+            }
+            SUBCASE("get_mut + modified") {
+                *e1.get_mut<Position>() = {4, 2};
+                e1.modified<Position>();
+            }
 
-        CHECK_EQ(evts.front().evt, flecs::OnSet);
-        CHECK_EQ(evts.front().id, position);
-        REQUIRE_EQ(evts.front().data.size(), 1);
-        CHECK_EQ(evts.front().data[0].id, e);
-        CHECK_EQ(evts.front().data[0].value, "{x: 20, y: 15}");
-        evts.pop_front();
+            REQUIRE_EQ(evts.size(), 1);
+            CHECK(q_read.changed());
 
-        CHECK_EQ(evts.front().evt, flecs::OnAdd);
-        CHECK_EQ(evts.front().id, rotation);
-        REQUIRE_EQ(evts.front().data.size(), 1);
-        CHECK_EQ(evts.front().data[0].id, e);
-        CHECK_EQ(evts.front().data[0].value, std::string{});
-        evts.pop_front();
+            CHECK_COMPONENT_EQ(e1, Position, "{x: 4, y: 2}");
+            CHECK_EQ(evts.front().evt, flecs::OnSet);
+            CHECK_EQ(evts.front().id, position);
+            REQUIRE_EQ(evts.front().data.size(), 1);
+            CHECK_EQ(evts.front().data[0].id, e1);
+            CHECK_EQ(evts.front().data[0].value, "{x: 4, y: 2}");
+            evts.pop_front();
+//
+//            e.set<Position>({20.0, 15.0})
+//                    .set<Rotation>({45.0});
+//
+//            REQUIRE_EQ(evts.size(), 3);
+//
+//            CHECK_EQ(evts.front().evt, flecs::OnSet);
+//            CHECK_EQ(evts.front().id, position);
+//            REQUIRE_EQ(evts.front().data.size(), 1);
+//            CHECK_EQ(evts.front().data[0].id, e);
+//            CHECK_EQ(evts.front().data[0].value, "{x: 20, y: 15}");
+//            evts.pop_front();
+//
+//            CHECK_EQ(evts.front().evt, flecs::OnAdd);
+//            CHECK_EQ(evts.front().id, rotation);
+//            REQUIRE_EQ(evts.front().data.size(), 1);
+//            CHECK_EQ(evts.front().data[0].id, e);
+//            CHECK_EQ(evts.front().data[0].value, std::string{});
+//            evts.pop_front();
+//
+//            CHECK_EQ(evts.front().evt, flecs::OnSet);
+//            CHECK_EQ(evts.front().id, rotation);
+//            REQUIRE_EQ(evts.front().data.size(), 1);
+//            CHECK_EQ(evts.front().data[0].id, e);
+//            CHECK_EQ(evts.front().data[0].value, "{deg: 45}");
+//            evts.pop_front();
+        }
 
-        CHECK_EQ(evts.front().evt, flecs::OnSet);
-        CHECK_EQ(evts.front().id, rotation);
-        REQUIRE_EQ(evts.front().data.size(), 1);
-        CHECK_EQ(evts.front().data[0].id, e);
-        CHECK_EQ(evts.front().data[0].value, "{deg: 45}");
-        evts.pop_front();
 
-        observer.disable();
-        observer.destruct();
     }
 
     SUBCASE("merge changes into system") {
