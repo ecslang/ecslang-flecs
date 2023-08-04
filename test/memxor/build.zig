@@ -42,6 +42,7 @@ pub fn build(b: *std.Build) void {
         if (target.isWindows() and target.getAbi() == .gnu) {
             // LTO is currently broken on mingw, this can be removed when it's fixed.
             exe.want_lto = false;
+            exe.bundle_compiler_rt = true;
         }
 
         // This declares intent for the executable to be installed into the

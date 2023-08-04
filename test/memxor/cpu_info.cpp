@@ -11,6 +11,12 @@
 #include <sys/utsname.h>
 #endif
 
+#ifdef _WIN32
+#include <intrin.h>
+#elif defined(__GNUC__) || defined(__clang__)
+#include <immintrin.h>
+#endif
+
 #ifdef __cpp_lib_hardware_interference_size
     using std::hardware_constructive_interference_size;
     using std::hardware_destructive_interference_size;
@@ -84,6 +90,24 @@ struct CacheDetails {
 
 int main() {
     std::vector<CacheDetails> caches;
+
+    bool supportsAVX = false;
+    bool supportsAVX2 = false;
+    bool supportsAVX512 = false;
+
+#if defined(_WIN32)
+    int cpuInfo[4];
+    __cpuid(cpuInfo, 1);
+    supportsAVX = cpuInfo[2] & (1 << 28);
+
+    __cpuidex(cpuInfo, 7, 0);
+    supportsAVX2 = cpuInfo[1] & (1 << 5);
+    supportsAVX512 = cpuInfo[1] & (1 << 16);
+#elif defined(__GNUC__) || defined(__clang__)
+    supportsAVX   = __builtin_cpu_supports("avx");
+    supportsAVX2  = __builtin_cpu_supports("avx2");
+    supportsAVX512 = __builtin_cpu_supports("avx512f");
+#endif
 
 #ifdef _WIN32
     SYSTEM_INFO sysInfo;
@@ -228,5 +252,20 @@ int main() {
         }
     }
 
+    if (supportsAVX || supportsAVX2 || supportsAVX512) {
+        std::cout << "\nRuntime Supported SIMD Intrinsics:\n";
+
+        if (supportsAVX) {
+            std::cout << "- AVX\n";
+        }
+
+        if (supportsAVX2) {
+            std::cout << "- AVX2\n";
+        }
+
+        if (supportsAVX512) {
+            std::cout << "- AVX-512\n";
+        }
+    }
     return 0;
 }
