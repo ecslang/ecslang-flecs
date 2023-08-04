@@ -9,6 +9,13 @@ zig build -Doptimize=ReleaseFast
 
 ## Intrinsics
 
+see:
+- [Intel Intrinsics Guide](https://software.intel.com/sites/landingpage/IntrinsicsGuide/)
+- [ARM Intrinsics](https://developer.arm.com/architectures/instruction-sets/intrinsics/)
+- [ARM C Intrinsics](https://developer.arm.com/documentation/dui0491/i/Using-NEON-Support/Intrinsics)
+- [ARM Intrinsics Guide](https://developer.arm.com/documentation/den0018/a/NEON-Intrinsics/)
+
+
 **AVX-512**
 ```
 __m512i _mm512_xor_si512 (__m512i a, __m512i b)
