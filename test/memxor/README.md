@@ -61,9 +61,11 @@ Throughput: 0.33
 ## TODO:
 
 **Shared Memory**
-- [ ] Research [File Sealing] with F_SEAL_FUTURE_WRITE (https://man7.org/linux/man-pages/man2/fcntl.2.html) (Unix)
-- [ ] Research [tmpfs](https://man7.org/linux/man-pages/man5/tmpfs.5.html) (Linux - Fallback)
+
+- [ ] research [file sealing](https://man7.org/linux/man-pages/man2/fcntl.2.html) with F_SEAL_FUTURE_WRITE (Linux 5.1+)
+- [ ] research [tmpfs](https://man7.org/linux/man-pages/man5/tmpfs.5.html) (Linux - Fallback)
 
 **Memory Change Detection**
-- [ ] Measure Performance of Memory Change Detection (XOR, Parity, Hamming)
-- [ ] Research [Hamming Codes](https://en.wikipedia.org/wiki/Hamming_code) & [FEC Codes](https://en.wikipedia.org/wiki/Error_correction_code#Forward_error_correction)
+
+- [ ] measure Performance of Memory Change Detection (XOR, Parity, Hamming)
+- [ ] research [Hamming Codes](https://en.wikipedia.org/wiki/Hamming_code) & [FEC Codes](https://en.wikipedia.org/wiki/Error_correction_code#Forward_error_correction)
