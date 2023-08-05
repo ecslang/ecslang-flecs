@@ -29,6 +29,7 @@ struct AddPosition {
 
 bool DEBUG_LOGGING = true;
 bool OBSERVER_LOGGING = false;
+bool TABLE_LOGGING = false;
 
 void debug_log_evt(flecs::iter& it)
 {
@@ -324,39 +325,75 @@ TEST_CASE("flecs system tests") {
                 CHECK_EQ(evts.front().data[0].value, "{x: 4, y: 2}");
                 evts.pop_front();
             }
-//
-//            e.set<Position>({20.0, 15.0})
-//                    .set<Rotation>({45.0});
-//
-//            REQUIRE_EQ(evts.size(), 3);
-//
-//            CHECK_EQ(evts.front().evt, flecs::OnSet);
-//            CHECK_EQ(evts.front().id, position);
-//            REQUIRE_EQ(evts.front().data.size(), 1);
-//            CHECK_EQ(evts.front().data[0].id, e);
-//            CHECK_EQ(evts.front().data[0].value, "{x: 20, y: 15}");
-//            evts.pop_front();
-//
-//            CHECK_EQ(evts.front().evt, flecs::OnAdd);
-//            CHECK_EQ(evts.front().id, rotation);
-//            REQUIRE_EQ(evts.front().data.size(), 1);
-//            CHECK_EQ(evts.front().data[0].id, e);
-//            CHECK_EQ(evts.front().data[0].value, std::string{});
-//            evts.pop_front();
-//
-//            CHECK_EQ(evts.front().evt, flecs::OnSet);
-//            CHECK_EQ(evts.front().id, rotation);
-//            REQUIRE_EQ(evts.front().data.size(), 1);
-//            CHECK_EQ(evts.front().data[0].id, e);
-//            CHECK_EQ(evts.front().data[0].value, "{deg: 45}");
-//            evts.pop_front();
         }
-
-
     }
 
-    SUBCASE("merge changes into system") {
-        // TODO: research how to do this - maybe ecs_async_stage_new followed by ecs_merge
-        //  see https://www.flecs.dev/flecs/group__commands.html#gaa7dbf97185ee60c86284b7c73e151fd5
+    SUBCASE("query and sync component changes") {
+        auto e1 = ecs.entity().add<Position>().set<AddPosition>({2, 1});
+        auto e2 = ecs.entity().add<Position>().set<AddPosition>({4, 2});
+        auto e3 = ecs.entity().add<Position>().set<AddPosition>({6, 3});
+        auto e4 = ecs.entity().set<Position>({-1, -2}).set<AddPosition>({0, 0});
+        auto e5 = ecs.entity().set<Position>({-5, -10});
+
+        auto sMove = ecs.system<Position, const AddPosition>()
+            .each([](Position& pos, const AddPosition& add) {
+                pos.x += add.x;
+                pos.y += add.y;
+            });
+
+        auto qRead = ecs.query_builder<const Position>()
+            .instanced()
+            .build();
+
+        qRead.changed();
+        auto syncChanges = [&](const char* title) -> size_t {
+            size_t active = 0;
+
+            if (TABLE_LOGGING) {
+                std::cout << "------------------------------------------------------" << std::endl;
+                std::cout << title << std::endl;
+                std::cout << "------------------------------------------------------" << std::endl;
+            }
+            qRead.iter([&active](flecs::iter &it, const Position *pos) {
+                if (TABLE_LOGGING) {
+                    std::cout << "TABLE (entries: " << it.count() << ", changed: " << it.changed() << ")  {\n";
+                }
+                if (it.changed()) {
+                    active += it.count();
+                    for (auto i: it) {
+                        if (TABLE_LOGGING) {
+                            std::cout << " - " << it.entity(i).path() << ": Position={" << pos[i].x << ", " << pos[i].y
+                                      << "}\n";
+                        }
+                    }
+                }
+                else {
+                    it.skip();
+                }
+                if (TABLE_LOGGING) {
+                    std::cout << "}\n";
+                }
+            });
+
+            return active;
+        };
+
+        sMove.run();
+
+        CHECK_EQ(syncChanges("Initial sync"), 5);
+
+        CHECK_EQ(syncChanges("Empty sync"), 0);
+
+        sMove.run();
+        CHECK_EQ(syncChanges("Partial sync #1"), 4);
+
+        e2.disable<AddPosition>();
+        e4.disable<AddPosition>();
+
+        sMove.run();
+        CHECK_EQ(syncChanges("Partial sync #2"), 4);
+
+        sMove.run();
+        CHECK_EQ(syncChanges("Partial sync #3"), 2);
     }
 }
