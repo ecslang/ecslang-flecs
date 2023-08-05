@@ -49,7 +49,21 @@ Latency: 1
 Throughput: 0.33
 ```
 
+## References
+
+### Shared Memory
+
+- [mmap](https://man7.org/linux/man-pages/man2/mmap.2.html)
+- [memfd_create](https://man7.org/linux/man-pages/man2/memfd_create.2.html)
+- [memfd_secret](https://man7.org/linux/man-pages/man2/memfd_secret.2.html)
+- [fcntl](https://man7.org/linux/man-pages/man2/fcntl.2.html)
+
 ## TODO:
 
+**Shared Memory**
+- [ ] Research [File Sealing] with F_SEAL_FUTURE_WRITE (https://man7.org/linux/man-pages/man2/fcntl.2.html) (Unix)
+- [ ] Research [tmpfs](https://man7.org/linux/man-pages/man5/tmpfs.5.html) (Linux - Fallback)
+
+**Memory Change Detection**
 - [ ] Measure Performance of Memory Change Detection (XOR, Parity, Hamming)
 - [ ] Research [Hamming Codes](https://en.wikipedia.org/wiki/Hamming_code) & [FEC Codes](https://en.wikipedia.org/wiki/Error_correction_code#Forward_error_correction)
