@@ -2,6 +2,7 @@
 
 ## TODO
 
+- [ ] evaluate [clangml](https://github.com/thierry-martinez/clangml/)
 - [ ] evaluate Rust
 - [ ] evaluate Nim
 - [ ] evaluate Swift
